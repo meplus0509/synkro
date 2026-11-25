@@ -2,6 +2,8 @@
 
 Logiciel de synchronisation et de sauvegarde de dossiers pour Windows : dossiers de ce PC ou partages réseau, clé USB ou disque externe, serveur distant en SFTP.
 
+> Synkro a été écrit avec l'aide de [Claude](https://claude.ai), l'assistant IA d'Anthropic.
+
 Un seul exécutable, `Synkro.exe` : un moteur écrit en Go qui sert une interface web, affichée dans une fenêtre Windows (WebView2).
 
 - **Utilisateurs** : voir le manuel d'utilisation [`docs/Synkro-Manuel.pdf`](docs/Synkro-Manuel.pdf) (aussi en Word).

@@ -1,0 +1,4 @@
+*.exe
+!engine/cmd/synkrod/rsrc_windows_amd64.syso
+synkro-data/
+*.log

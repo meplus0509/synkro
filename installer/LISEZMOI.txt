@@ -1,0 +1,37 @@
+Synkro — synchronisation et sauvegarde de dossiers
+===================================================
+
+Synkro garde deux dossiers à l'identique, ou en sauvegarde l'un vers l'autre :
+dossiers de ce PC, clé USB ou disque externe, serveur distant en SFTP.
+
+Ce qu'il fait
+-------------
+- Analyse d'abord : la liste de ce qui serait copié, supprimé ou en conflit,
+  avant de toucher à quoi que ce soit.
+- Modes : miroir, sauvegarde (sens unique) ou synchronisation dans les deux sens.
+- Corbeille : les fichiers remplacés ou supprimés sont mis de côté dans un
+  dossier .synkro-trash, récupérables.
+- Planification, lancement au démarrage, à la fermeture de session, ou quand
+  un fichier change ; groupes de tâches lancées à la suite.
+- Fichiers verrouillés (Outlook…) copiés grâce aux instantanés Windows
+  (en lançant Synkro en administrateur).
+- Pause, reprise et changement de vitesse pendant les transferts.
+
+Mode installé ou portable
+-------------------------
+- Installé : Synkro.exe dans le dossier choisi ; vos tâches et réglages dans
+  %APPDATA%\Synkro. Désinstallation par Paramètres Windows › Applications.
+- Portable : tout reste dans le dossier choisi (clé USB par exemple) ; les
+  tâches et réglages dans le sous-dossier synkro-data. Le fichier « portable »
+  à côté de Synkro.exe active ce mode. Pour l'enlever, supprimez le dossier.
+
+Premier lancement
+-----------------
+La fenêtre Options s'ouvre : langue, unités, thème, icône près de l'horloge,
+journal (fichiers logs). Elle reste accessible ensuite par le bouton Options
+(Ctrl+,). Touche F1 : liste des raccourcis clavier.
+
+Journal
+-------
+Désactivé par défaut. À activer dans Options › Journal en cas de problème :
+le fichier synkrod.log se trouve dans le sous-dossier « logs » des données.

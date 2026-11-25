@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: blob:">
+<title>Synkro</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><circle cx="16" cy="16" r="15" class="logo-bg"/><path d="M9 13a7 7 0 0 1 12.5-3.5M23 19a7 7 0 0 1-12.5 3.5" class="logo-arc"/><path d="M22 6v4.5h-4.5M10 26v-4.5h4.5" class="logo-arc"/></svg>
+      <span>Synkro</span>
+    </div>
+    <div class="new-btns">
+      <button id="btn-new" class="primary">+ Nouvelle tâche</button>
+      <button id="btn-new-group" title="Créer un groupe pour ranger et lancer plusieurs tâches ensemble">+ Nouveau groupe</button>
+    </div>
+    <div id="sel-bar" class="sel-bar" hidden>
+      <span id="sel-count"></span>
+      <button type="button" id="sel-run" class="primary wide">Synchroniser l'un après l'autre</button>
+      <button type="button" id="sel-clear" class="link">Tout désélectionner</button>
+    </div>
+    <ul id="job-list"></ul>
+    <div class="side-hint">Clic droit sur une tâche : modifier, déplacer vers un groupe… Clic droit sur un groupe : lancer toutes ses tâches. Glissez une tâche pour changer l'ordre ou la mettre dans un groupe.</div>
+    <button type="button" id="btn-options" class="side-opt">⚙ Options</button>
+    <div id="sidebar-foot"></div>
+    <div id="side-resize" title="Tirer pour élargir ou réduire · double-clic : largeur d'origine"></div>
+  </aside>
+
+  <main id="main">
+    <section id="empty" class="empty">
+      <h1>Bienvenue dans Synkro</h1>
+      <p>Créez un job pour synchroniser deux dossiers : un disque local, une clé USB ou un serveur SFTP.</p>
+      <button id="btn-new-2" class="primary">Créer mon premier job</button>
+    </section>
+
+    <section id="group-view" hidden>
+      <header class="job-head">
+        <div>
+          <h1 id="gv-name"></h1>
+          <div id="gv-meta" class="muted"></div>
+        </div>
+        <div class="actions">
+          <button type="button" id="gv-analyze">Tout analyser</button>
+          <button type="button" id="gv-sync" class="primary">Tout synchroniser à la suite</button>
+        </div>
+      </header>
+      <div id="gv-cards" class="gv-cards"></div>
+      <div class="table-wrap gv-wrap">
+        <table class="grid gv-table"><colgroup><col><col><col><col><col><col></colgroup>
+          <thead><tr><th>Tâche</th><th>Mode</th><th>Gauche → droite</th><th>Dernier passage</th><th>Résultat</th><th class="gv-act">Actions</th></tr></thead>
+          <tbody id="gv-body"></tbody>
+        </table>
+      </div>
+      <p class="muted gv-hint">Clic sur une tâche : l'ouvrir · double-clic : la modifier · clic droit sur le groupe (à gauche) : planifier, renommer…</p>
+    </section>
+
+    <section id="job" hidden>
+      <header class="job-head">
+        <div>
+          <h1 id="job-name"></h1>
+          <div id="job-meta" class="muted"></div>
+        </div>
+        <div class="actions">
+          <button id="btn-analyze">Analyser</button>
+          <button id="btn-sync" class="primary">Synchroniser</button>
+          <button id="btn-pause" hidden>⏸ Pause</button>
+          <select id="sel-speed" hidden title="Vitesse de transfert : changée tout de suite, sans interrompre la copie (et gardée pour la tâche)">
+            <option value="0">Vitesse : illimitée</option>
+            <option value="250">Vitesse : 250 Ko/s</option>
+            <option value="500">Vitesse : 500 Ko/s</option>
+            <option value="750">Vitesse : 750 Ko/s</option>
+            <option value="1024">Vitesse : 1 Mo/s</option>
+            <option value="2048">Vitesse : 2 Mo/s</option>
+            <option value="5120">Vitesse : 5 Mo/s</option>
+            <option value="10240">Vitesse : 10 Mo/s</option>
+            <option value="custom">Vitesse : autre…</option>
+          </select>
+          <button id="btn-cancel" class="danger" hidden>Annuler</button>
+        </div>
+      </header>
+      <div id="job-sides" class="sides"></div>
+
+
+      <nav class="tabs">
+        <button data-tab="actions" class="active">Actions</button>
+        <button data-tab="log">Journal</button>
+        <div id="cards" class="cards"></div>
+      </nav>
+      <div id="tab-actions" class="tab">
+        <div id="dates-bar" class="dates-bar" hidden>
+          <span id="dates-text"></span>
+          <button type="button" id="dates-fix" class="primary small-btn">Corriger les dates</button>
+          <button type="button" id="dates-show" class="ghost small-btn">Voir ces fichiers</button>
+          <button type="button" id="dates-close" class="dates-close" title="Ne pas corriger (jusqu'à la prochaine analyse)" aria-label="Fermer">×</button>
+        </div>
+        <div class="filter-row">
+          <div class="seg-btn" role="group" aria-label="Affichage">
+            <button type="button" id="view-tree" class="on">Arborescence</button>
+            <button type="button" id="view-list">Liste</button>
+          </div>
+          <input id="filter" type="search" placeholder="Filtrer par chemin…">
+          <label><input id="only-errors" type="checkbox"> Échecs et conflits seulement</label>
+          <label title="Pendant la synchro, faire défiler la liste jusqu'au fichier en cours"><input id="follow" type="checkbox" checked> Suivre le fichier en cours</label>
+          <button type="button" id="show-same" class="ghost small-btn" title="Afficher aussi les fichiers déjà identiques des deux côtés">Afficher les inchangés</button>
+          <span class="spacer"></span>
+          <button type="button" id="expand-all" class="ghost small-btn">Tout déplier</button>
+          <button type="button" id="collapse-all" class="ghost small-btn">Tout replier</button>
+          <button type="button" id="cols-reset" class="ghost small-btn" title="Remettre les colonnes de la liste à leur largeur d'origine">↺ Colonnes</button>
+        </div>
+        <div id="legend" class="legend muted"></div>
+        <div class="table-wrap">
+          <table class="grid fixed" id="actions-table">
+            <colgroup id="actions-cols"></colgroup>
+            <thead><tr id="actions-head"></tr></thead>
+            <tbody id="actions-body"></tbody>
+          </table>
+        </div>
+        <p id="actions-more" class="muted center" hidden></p>
+        <!-- détail de la ligne cliquée (nom, départ, destination, taille, avancement) -->
+        <section id="item-detail" hidden aria-live="polite"></section>
+        <p id="actions-empty" class="muted center">Lancez une analyse pour voir ce qui sera fait.</p>
+        <!-- pendant la lecture des deux côtés : avancement au milieu de la liste -->
+        <div id="scan-panel" hidden>
+          <div class="scan-pct"><span id="scan-pct"></span> <small>analyse</small></div>
+          <div id="scan-path" class="scan-path"></div>
+          <div class="scan-sides">
+            <div class="scan-side" data-side="left"><div class="scan-name">Côté gauche <em></em></div><div class="bar"><div></div></div><div class="scan-n"></div></div>
+            <div class="scan-side" data-side="right"><div class="scan-name">Côté droit <em></em></div><div class="bar"><div></div></div><div class="scan-n"></div></div>
+          </div>
+        </div>
+        <div id="fix-panel" hidden>
+          <div class="scan-pct"><span id="fix-pct"></span> <small>correction des dates</small></div>
+          <div class="scan-path">Seules les dates sont modifiées à droite : aucun fichier n'est copié ni supprimé.</div>
+          <div class="fix-bar"><div class="bar"><div></div></div><div id="fix-n" class="scan-n"></div></div>
+        </div>
+      </div>
+      <div id="tab-log" class="tab" hidden>
+        <pre id="log"></pre>
+      </div>
+      <!-- bas de page : état du passage en cours -->
+      <footer class="job-foot">
+        <div id="status-box" class="status-box">
+          <div id="status-msg"></div>
+          <div class="bar"><div id="bar-fill"></div></div>
+          <div id="status-sub" class="muted"></div>
+        </div>
+      </footer>
+    </section>
+  </main>
+</div>
+
+<!-- Options générales -->
+<dialog id="dlg-options">
+  <h2>Options</h2>
+  <fieldset>
+    <legend>Général</legend>
+    <label class="field inline">Langue :
+      <select id="opt-lang"><option value="fr">Français</option><option value="en">English</option></select></label>
+    <small id="opt-lang-note" class="muted" hidden>La langue changera en cliquant sur « Enregistrer » · Language changes when you click “Save”.</small>
+    <label class="field inline">Tailles :
+      <select id="opt-units"><option value="kb">en KB, MB, GB</option><option value="bytes">en octets</option></select></label>
+    <label class="field inline">Thème :
+      <select id="opt-theme"><option value="system">Système (réglage de Windows)</option><option value="light">Clair</option><option value="dark">Sombre</option></select></label>
+  </fieldset>
+  <fieldset class="win-only">
+    <legend>Fenêtre</legend>
+    <label class="check"><input type="checkbox" id="opt-taskbar"> Afficher l'icône dans la barre des tâches</label>
+    <label class="check"><input type="checkbox" id="opt-tray"> Afficher l'icône dans la zone de notification (près de l'horloge)</label>
+    <label class="check"><input type="checkbox" id="opt-closeToTray"> Réduire Synkro dans la zone de notification à la fermeture de la fenêtre</label>
+    <small class="muted" id="opt-tray-note"></small>
+    <div><button type="button" id="opt-shortcut">Ajouter un raccourci sur le bureau</button>
+      <button type="button" id="opt-startmenu">Ajouter au menu Démarrer</button></div>
+    <div id="opt-shortcut-msg" class="muted"></div>
+  </fieldset>
+  <fieldset class="win-only">
+    <legend>Fichiers verrouillés (Volume Shadow Copy)</legend>
+    <label class="check"><input type="checkbox" id="opt-vssLocked"> Copier les fichiers verrouillés <small>(lus dans un instantané du disque quand un autre programme les bloque)</small></label>
+    <label class="check"><input type="checkbox" id="opt-vssSnapshot"> Instantané du dossier source avant la synchronisation <small>(tâches à sens unique : miroir et sauvegarde ; fichiers cohérents, jamais verrouillés)</small></label>
+    <small class="muted" id="opt-admin-note"></small>
+  </fieldset>
+  <fieldset>
+    <legend>Journal (fichiers logs)</legend>
+    <label class="check"><input type="checkbox" id="opt-logs"> Écrire le journal de Synkro <small>(dossier « logs » des données, fichier synkrod.log)</small></label>
+    <label>Niveau de détail
+      <select id="opt-logLevel">
+        <option value="errors">Erreurs seulement (erreurs, échecs, plantages)</option>
+        <option value="info">Normal (erreurs + lancements et fins des tâches)</option>
+        <option value="debug">Détaillé (débogage : tout, y compris chaque fichier)</option>
+      </select></label>
+    <small class="muted" id="opt-log-note"></small>
+  </fieldset>
+  <fieldset>
+    <legend>Clavier</legend>
+    <button type="button" id="opt-keys">⌨ Voir les raccourcis clavier (F1)</button>
+  </fieldset>
+  <div class="dlg-buttons"><button type="button" id="opt-cancel" class="ghost" hidden>Annuler</button>
+    <button type="button" id="opt-close" class="primary">Fermer</button></div>
+</dialog>
+
+<!-- Formulaire de job -->
+<dialog id="dlg-job">
+  <form id="job-form" method="dialog">
+    <h2 id="dlg-title">Nouvelle tâche</h2>
+    <label class="field">Nom<input name="name" required maxlength="80" placeholder="Ex : Documents ⇄ Clé USB"></label>
+
+    <div class="sides">
+      <fieldset class="side" data-side="left">
+        <legend>Côté gauche</legend>
+        <div class="ep-editor"></div>
+      </fieldset>
+      <fieldset class="side" data-side="right">
+        <legend>Côté droit</legend>
+        <div class="ep-editor"></div>
+      </fieldset>
+    </div>
+
+    <fieldset>
+      <legend>Mode</legend>
+      <div class="modes">
+        <label class="mode"><input type="radio" name="mode" value="two-way" checked><b>Bidirectionnel</b><span>Les changements des deux côtés sont propagés. Conflit : la version la plus récente gagne.</span></label>
+        <label class="mode"><input type="radio" name="mode" value="mirror"><b>Miroir →</b><span>La droite devient une copie exacte de la gauche (suppressions comprises).</span></label>
+        <label class="mode"><input type="radio" name="mode" value="backup"><b>Sauvegarde →</b><span>Copie gauche vers droite, sans jamais rien supprimer à droite.</span></label>
+      </div>
+    </fieldset>
+
+    <details>
+      <summary>Options avancées</summary>
+      <fieldset class="filter-opts">
+        <legend>Filtres</legend>
+      <label class="field">Inclure seulement (une par ligne ; vide = tout inclure)
+        <textarea name="include" rows="3" placeholder="*.exe&#10;/Documents"></textarea>
+        <small>Si cette liste n'est pas vide, seuls ces éléments sont synchronisés (un dossier inclus l'est avec tout son contenu). Mêmes règles d'écriture que les exclusions.</small>
+      </label>
+      <label class="field">Exclure ensuite (une par ligne ; vide = rien exclure)
+        <textarea name="exclude" rows="4" placeholder="*.tmp&#10;node_modules&#10;/build&#10;Thumbs.db"></textarea>
+        <small>Sans « / » : nom de fichier ou de dossier n'importe où. Avec « / » : chemin depuis la racine.</small>
+      </label>
+        <label class="check"><input type="checkbox" name="excludeEmptyDirs"> Exclure les dossiers vides</label>
+        <label class="check"><input type="checkbox" name="excludeHidden"> Exclure les fichiers et dossiers cachés</label>
+        <label class="check"><input type="checkbox" name="excludeSystem"> Exclure les fichiers et dossiers système</label>
+        <label class="check"><input type="checkbox" name="excludeTemp"> Exclure les fichiers temporaires <small class="muted">(*.tmp, ~$*, *.part, *.crdownload…)</small></label>
+      </fieldset>
+      <fieldset class="conflict-opts" id="conflict-opts">
+        <legend>Conflits (mode bidirectionnel)</legend>
+        <small class="muted">Un conflit, c'est un fichier modifié des deux côtés depuis la dernière synchro, ou modifié d'un côté et supprimé de l'autre (au premier passage : tout fichier présent des deux côtés avec une date ou une taille différente).</small>
+        <label class="field inline">Version gardée par défaut :
+          <select name="conflictDefault">
+            <option value="newer">la plus récente</option>
+            <option value="left">toujours celle de gauche</option>
+            <option value="right">toujours celle de droite</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" name="conflictAsk" checked> Me montrer les conflits et me laisser choisir avant de synchroniser</label>
+        <small class="muted">Lors d'une synchro automatique, personne ne peut répondre : les fichiers en conflit sont alors laissés tels quels et proposés à la prochaine synchro manuelle.</small>
+      </fieldset>
+      <fieldset class="transfer-opts">
+        <legend>Transferts (SFTP ou local)</legend>
+        <label class="field inline">Limite de vitesse :
+          <input type="number" name="maxKBps" min="0" max="10000000" value="0"> Ko/s <small>(0 = illimitée)</small></label>
+        <label class="field inline">Fichiers copiés en parallèle :
+          <input type="number" name="parallel" min="0" max="64" value="0"> <small>(0 = automatique : 8 en SFTP, 24 entre dossiers locaux)</small></label>
+        <label class="field inline">En cas de coupure, réessayer la connexion pendant
+          <input type="number" name="retrySeconds" min="0" max="86400" value="60"> secondes <small>(0 = jamais : le fichier passe tout de suite en échec)</small></label>
+        <label class="field inline">Ordre de copie des fichiers :
+          <select name="copyOrder">
+            <option value="">du plus petit au plus gros (conseillé)</option>
+            <option value="size-desc">du plus gros au plus petit</option>
+            <option value="path">dans l'ordre de la liste</option>
+          </select></label>
+        <label class="check"><input type="checkbox" name="copyCreated"> Copier la date de création des fichiers</label>
+        <label class="check"><input type="checkbox" name="copyAttrs"> Copier les attributs des fichiers <small>(lecture seule, caché, système, archive)</small></label>
+        <small class="muted">Windows, entre dossiers locaux, clés USB ou disques (pas en SFTP).</small>
+        <label class="check"><input type="checkbox" name="fixDates"> Corriger la date des fichiers identiques à 1 ou 2 s près
+          <small>(miroir et sauvegarde : la date de gauche est recopiée à droite, sans recopier le fichier)</small></label>
+      </fieldset>
+      <label class="check"><input type="checkbox" name="useTrash" checked> Garder les fichiers supprimés ou écrasés dans <code>.synkro-trash</code></label>
+      <label class="check"><input type="checkbox" name="allowEmptySide"> Désactiver le garde-fou « côté vide » (déconseillé)</label>
+      <fieldset class="auto-opts">
+        <legend>Analyse et synchronisation automatiques</legend>
+        <label class="check"><input type="checkbox" name="onChange"> Sur changement de fichier, après
+          <input type="number" name="changeDelay" min="1" max="86400" value="10"> secondes sans nouveau changement</label>
+        <label class="check"><input type="checkbox" name="syncOnPlug"> À la connexion aux dossiers <small>(clé branchée, disque ou serveur de nouveau accessible)</small></label>
+        <label class="check"><input type="checkbox" name="onStart"> Au démarrage de Synkro</label>
+        <label class="check"><input type="checkbox" name="periodic"> Périodiquement, toutes les
+          <input type="number" name="autoH" min="0" max="168" value="1"> h
+          <input type="number" name="autoM" min="0" max="59" value="0"> min</label>
+        <label class="check"><input type="checkbox" name="onLogoff"> À la fermeture de session <small>(Windows)</small></label>
+        <label class="field inline">Ne pas synchroniser si le nombre de modifications dépasse
+          <input type="number" name="maxChanges" min="0" max="100000000" value="0"> <small>(0 = pas de limite)</small></label>
+        <small class="muted">Sur changement de fichier : seuls les côtés locaux (dossier, clé USB) sont surveillés.</small>
+      </fieldset>
+      <label class="check"><input type="checkbox" name="autoClear"> Effacer la liste après une synchronisation, ou une analyse sans changement</label>
+    </details>
+
+    <p id="form-error" class="error" hidden></p>
+    <div class="dlg-buttons">
+      <button type="button" id="btn-form-cancel" class="ghost">Annuler</button>
+      <button type="submit" class="primary">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Menu du clic droit sur un job -->
+<div id="ctx-menu" class="ctx-menu" hidden role="menu"></div>
+
+<!-- Résolution des conflits -->
+<dialog id="dlg-conflicts" class="wide-dlg">
+  <h2>Conflits à résoudre</h2>
+  <p class="muted" id="cf-intro"></p>
+  <div class="cf-tools">
+    <span>Pour tous les fichiers :</span>
+    <button type="button" class="ghost small-btn" data-all="left">← Gauche</button>
+    <button type="button" class="ghost small-btn" data-all="right">Droite →</button>
+    <button type="button" class="ghost small-btn" data-all="newer">La plus récente</button>
+    <button type="button" class="ghost small-btn" data-all="leave">Ne rien faire</button>
+  </div>
+  <div class="cf-scroll">
+    <table class="grid cf-table">
+      <thead><tr><th>Fichier</th><th class="cf-side">Gauche</th><th class="cf-choice">Version à garder</th><th class="cf-side">Droite</th></tr></thead>
+      <tbody id="cf-body"></tbody>
+    </table>
+  </div>
+  <p class="muted cf-sum" id="cf-sum"></p>
+  <div class="dlg-buttons">
+    <button type="button" id="cf-abort" class="ghost">Abandonner la copie</button>
+    <button type="button" id="cf-ok" class="primary">Valider et synchroniser</button>
+  </div>
+</dialog>
+
+<!-- Sélecteur de dossier (mode navigateur) -->
+<dialog id="dlg-keys">
+  <h2>Raccourcis clavier</h2>
+  <table class="keys">
+    <tr><th colspan="2">Tâche sélectionnée</th></tr>
+    <tr><td><kbd>F5</kbd></td><td>Analyser</td></tr>
+    <tr><td><kbd>F6</kbd> ou <kbd>Ctrl</kbd>+<kbd>Entrée</kbd></td><td>Synchroniser</td></tr>
+    <tr><td><kbd>F8</kbd></td><td>Pause / reprendre la synchronisation</td></tr>
+    <tr><td><kbd>Échap</kbd></td><td>Annuler l'analyse ou la synchronisation en cours, puis <kbd>O</kbd> oui, <kbd>N</kbd> ou <kbd>Échap</kbd> non</td></tr>
+    <tr><td><kbd>F2</kbd></td><td>Modifier la tâche</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>↑</kbd> / <kbd>Ctrl</kbd>+<kbd>↓</kbd></td><td>Tâche précédente / suivante</td></tr>
+    <tr><th colspan="2">Liste des fichiers</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Filtrer par chemin</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd></td><td>Tout déplier / tout replier</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>U</kbd></td><td>Afficher / masquer les inchangés</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd></td><td>Basculer entre Actions et Journal</td></tr>
+    <tr><th colspan="2">Général</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>Nouvelle tâche</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Nouveau groupe</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Options</td></tr>
+    <tr><td><kbd>F1</kbd> ou <kbd>?</kbd></td><td>Cette aide</td></tr>
+    <tr><th colspan="2">Fenêtres</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>Entrée</kbd></td><td>Bouton principal (Enregistrer, Valider…)</td></tr>
+    <tr><td><kbd>Échap</kbd></td><td>Fermer sans rien changer</td></tr>
+    <tr><th colspan="2">Aperçu d'un fichier</th></tr>
+    <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Fichier précédent / suivant</td></tr>
+    <tr><td><kbd>Échap</kbd></td><td>Fermer</td></tr>
+  </table>
+  <div class="dlg-buttons"><button type="button" id="keys-close" class="primary">Fermer</button></div>
+</dialog>
+
+<dialog id="dlg-view">
+  <h2 id="view-title"></h2>
+  <div id="view-meta" class="muted"></div>
+  <div id="view-body"></div>
+  <div class="dlg-buttons">
+    <span class="view-files">
+      <button type="button" id="view-prev-file" class="ghost" title="Fichier précédent de la liste (←)">◀ Fichier précédent</button>
+      <button type="button" id="view-next-file" class="ghost" title="Fichier suivant de la liste (→)">Fichier suivant ▶</button>
+    </span>
+    <span id="view-nav" hidden>
+      <button type="button" id="view-prev" class="ghost" title="Différence précédente">▲</button>
+      <button type="button" id="view-next" class="ghost" title="Différence suivante">▼</button>
+    </span>
+    <button type="button" id="view-left" class="ghost" hidden>Voir la gauche</button>
+    <button type="button" id="view-right" class="ghost" hidden>Voir la droite</button>
+    <button type="button" id="view-both" class="ghost">⇆ Côte à côte</button>
+    <button type="button" id="view-other" class="ghost"></button>
+    <button type="button" id="view-open" class="ghost">Ouvrir avec son application</button>
+    <button type="button" id="view-close" class="primary">Fermer</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-confirm">
+  <h2 id="confirm-title">Confirmer</h2>
+  <div id="confirm-text" class="confirm-text"></div>
+  <div class="dlg-buttons">
+    <button type="button" id="confirm-no" class="ghost">Annuler</button>
+    <button type="button" id="confirm-yes" class="primary">Continuer</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-cancel">
+  <h2 id="cancel-title">Annuler la synchronisation ?</h2>
+  <p id="cancel-text"></p>
+  <div class="dlg-buttons">
+    <button type="button" id="cancel-keep" class="ghost">Non, continuer</button>
+    <button type="button" id="cancel-next" class="danger">Annuler et passer au suivant</button>
+    <button type="button" id="cancel-all" class="danger">Tout annuler</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-plans">
+  <h2 id="plans-title">Planifier</h2>
+  <p class="muted">Lancement automatique à une date et une heure précises. Ajoutez autant de planifications que vous voulez.
+    Synkro doit être ouvert à ce moment-là (un lancement manqué de moins de 12 h est fait à l'ouverture).</p>
+  <div class="plans-wrap">
+    <table class="grid">
+      <thead><tr><th>Active</th><th>Prochain lancement</th><th>Répétition</th><th>Dernier événement</th><th></th></tr></thead>
+      <tbody id="plans-body"></tbody>
+    </table>
+    <p id="plans-empty" class="muted center">Aucune planification pour l'instant.</p>
+  </div>
+  <div class="plan-add">
+    <label>Date <input type="date" id="plan-date"></label>
+    <label>Heure <input type="time" id="plan-time"></label>
+    <label>Répéter <select id="plan-repeat">
+      <option value="">une seule fois</option>
+      <option value="daily">tous les jours</option>
+      <option value="weekdays">du lundi au vendredi</option>
+      <option value="weekly">toutes les semaines</option>
+      <option value="monthly">tous les mois</option>
+    </select></label>
+    <button type="button" id="plan-add" class="primary">+ Ajouter</button>
+  </div>
+  <p id="plan-err" class="err-text"></p>
+  <div class="dlg-buttons"><button type="button" id="plans-close">Fermer</button></div>
+</dialog>
+
+<dialog id="dlg-summary" class="wide">
+  <h2 id="sum-title">Série de tâches terminée</h2>
+  <p id="sum-head" class="muted"></p>
+  <div class="sum-wrap">
+    <table class="grid">
+      <thead><tr><th>Tâche</th><th>Résultat</th><th>Détail</th><th>Fin</th></tr></thead>
+      <tbody id="sum-body"></tbody>
+    </table>
+  </div>
+  <div class="dlg-buttons"><button type="button" id="sum-close" class="primary">Fermer</button></div>
+</dialog>
+
+<dialog id="dlg-text">
+  <h2 id="text-title"></h2>
+  <label class="field"><span id="text-label"></span><input id="text-input" maxlength="80"></label>
+  <div class="dlg-buttons">
+    <button type="button" id="text-cancel" class="ghost">Annuler</button>
+    <button type="button" id="text-ok" class="primary">OK</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-trash">
+  <h2>Désactiver la corbeille ?</h2>
+  <p id="trash-text"></p>
+  <p class="muted">Ces sauvegardes ne pourront plus être récupérées si vous les supprimez.</p>
+  <div class="dlg-buttons">
+    <button type="button" data-v="back" class="ghost">Retour</button>
+    <button type="button" data-v="keep">Garder les fichiers</button>
+    <button type="button" data-v="empty" class="danger">Supprimer les sauvegardes</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-browse">
+  <h2>Choisir un dossier</h2>
+  <div class="browse-path"><button type="button" id="browse-up" class="ghost">↑</button><input id="browse-path"></div>
+  <ul id="browse-list"></ul>
+  <div class="dlg-buttons">
+    <button type="button" id="browse-cancel" class="ghost">Annuler</button>
+    <button type="button" id="browse-ok" class="primary">Choisir ce dossier</button>
+  </div>
+</dialog>
+
+<template id="tpl-ep">
+  <div class="seg">
+    <label><input type="radio" value="local" checked> Dossier</label>
+    <label title="La clé est reconnue par son numéro de série, quelle que soit sa lettre de lecteur"><input type="radio" value="usb"> Clé USB / disque</label>
+    <label><input type="radio" value="sftp"> SFTP</label>
+  </div>
+  <div class="ep-local">
+    <div class="row"><input class="local-path" placeholder="C:\Users\moi\Documents ou /media/usb/sauvegarde"><button type="button" class="pick">Parcourir…</button></div>
+  </div>
+  <div class="ep-usb" hidden>
+    <div class="row"><select class="u-drive"></select><button type="button" class="u-refresh ghost" title="Actualiser la liste des lecteurs">↻</button></div>
+    <div class="row"><input class="u-path" placeholder="Dossier dans la clé (ex : \\Sauvegarde) — vide = racine"><button type="button" class="u-pick">Parcourir…</button></div>
+    <div class="u-info muted"></div>
+  </div>
+  <div class="ep-sftp" hidden>
+    <div class="row"><input class="s-host" placeholder="Hôte (ex : nas.local)"><input class="s-port small" type="number" placeholder="22"></div>
+    <div class="row"><input class="s-user" placeholder="Utilisateur" autocomplete="off"><input class="s-pass" type="password" placeholder="Mot de passe" autocomplete="new-password"></div>
+    <div class="row"><input class="s-path" placeholder="Dossier distant (ex : /home/moi/sync)"><button type="button" class="s-pick" title="Se connecter et choisir le dossier sur le serveur">Parcourir…</button></div>
+    <details><summary>Clé privée SSH</summary>
+      <input class="s-key" placeholder="Chemin de la clé (ex : ~/.ssh/id_ed25519)">
+      <input class="s-keypass" type="password" placeholder="Phrase de passe (facultatif)" autocomplete="new-password">
+    </details>
+    <div class="s-hostkey muted"></div>
+  </div>
+  <div class="row test-row"><button type="button" class="test ghost">Tester la connexion</button><span class="test-result"></span></div>
+</template>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
